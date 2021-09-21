@@ -46,9 +46,11 @@ import "./Options.css"
 
     
   }
-  function onChangeAPI(event){
-    setLocalStorage({"api":event.target.value})
-  }
+
+//API Key seems to be hardcoded
+//  function onChangeAPI(event){
+//    setLocalStorage({"api":event.target.value})
+//  }
 
 if(ready){
   return(
@@ -59,7 +61,7 @@ if(ready){
 <br></br>
 <TextField  id="store_number" label="store number" variant="outlined" onChange={onChangeStore} defaultValue={store}    />
 <br></br>
-<TextField  id="api" label="API" variant="outlined" onChange={onChangeAPI} defaultValue={api} />
+<TextField  id="api" label="API" variant="outlined" value="d4465835234778cb3c58aeded4b489b306841a9f" inputProps={{readOnly:true}} />
 <br></br>
 
 

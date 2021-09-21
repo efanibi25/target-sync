@@ -22,6 +22,7 @@ useEffect(() => {
     }
        
  }, [target_token]);
+ //beginning of weeks
  function getSundays(){
     let sundays=[] 
     for (let i=0;i<3;i++){
@@ -35,6 +36,7 @@ useEffect(() => {
   
     return sundays                           
  }
+ //end of weeks
  function getSatdays(){
     let saturdays=[]
     for (let i=0;i<3;i++){
