@@ -16,7 +16,7 @@
    "32":"icon32.png",
    "16":"icon32.png"
   },
-  "permissions": ["storage","identity","tabs","scripting"],
+  "permissions": ["storage","identity","tabs","scripting","identity.email","notifications"],
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*", "<all_urls>"],
@@ -24,6 +24,10 @@
       "css": ["content.css"]
     }
   ],
+  "oauth2": {
+    "client_id": "469850214469-5p14s595o4cfnbckualtpc7cirot9s9s.apps.googleusercontent.com",
+    "scopes":["https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/userinfo.profile","https://www.googleapis.com/auth/userinfo.email"]
+  },
   "devtools_page": "devtools.html",
   "web_accessible_resources": [
     {

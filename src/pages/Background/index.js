@@ -1,217 +1,251 @@
-import * as methods from "../../../methods/methods.js"
-import secrets from 'secrets';
-import { setLocalStorage } from "../../../methods/methods.js";
+import * as methods from "../../../methods/general.js"
 const getUuid = require('uuid-by-string')
-
-//New Events
-async function createDict(data) {
-  let joblist = []
-  let key = await methods.readLocalStorage("key")
-
+import { key } from "../../../secrets.js"
+import * as events from "../../../methods/events.js"
+import icon from "../../assets/img/icon128.png"
+/*
+Create Calendar Event Objects to Push To Calendar API if Needed
+*/
+async function createEventsDict(data) {
+  let joblist = {}
   for (let index in data["schedules"]) {
     let slots = data["schedules"][index]
     //Some Workers May have Split Work Days
     for (let times in slots["display_segments"]) {
       let start = slots["display_segments"][times]["segment_start"]
       let end = slots["display_segments"][times]["segment_end"]
-      let name =slots["display_segments"][times]["job_name"]
+      let name = slots["display_segments"][times]["job_name"]
       start = new Date(start).toISOString()
       end = new Date(end).toISOString()
-      let id = key+getUuid(end).replace(/-/g, '')
+      let id = key + getUuid(start).replace(/-/g, '') + getUuid(end).replace(/-/g, '')
       let body = {
         "start": {
           "dateTime": start
-
         },
         "end": {
           "dateTime": end
-
         },
         "id": id,
         "summary": `Target ${name}`
       }
-      joblist.push(body)
+      joblist[id] = body
     }
   }
-  let added=await addEvents(joblist)
-  return added
+  return joblist
 }
+/*
+Sync 'Target' Calendar Events With Work Schedule
+i>3 Because only up to 3 weeks max for Target Schedules
+*/
+async function upDateCal(datalist) {
 
-async function addEvents(dict) {
-  let calendarid = await methods.readLocalStorage("calendarid")
-  let token = await methods.readLocalStorage("token")
-  let added={}
-  for (let index in dict) {
-    
-    let url = `https://www.googleapis.com/calendar/v3/calendars/${calendarid}/events`
-    const options = {
-      method: 'POST',
-      headers:new Headers({ 'authorization': `Bearer ${token}` }) ,
-      body: JSON.stringify(dict[index])
+
+  await checkCal()
+  let added = 0
+  let updated = 0
+  let removed = 0
+  for (let i = 0; i < 3; i++) {
+    let data = datalist[i]
+    data = JSON.parse(data)
+    let targetEvents = await createEventsDict(data)
+    console.debug("Hours to be Push To Calendar:", targetEvents)
+    let targetStart = data["start_date"]
+    let targetEnd = data["end_date"]
+    let eventList = await events.getEvents(targetStart, targetEnd)
+    let calKeys = eventList.reduce((prev, curr) => {
+      prev.push(curr["id"])
+      return prev
+    }, [])
+    for (let index in eventList) {
+      let eventObject = eventList[index]
+      let id = eventObject["id"]
+      let status = eventObject["status"]
+      let tarKeys = Object.keys(targetEvents)
+      if (!tarKeys.includes(id) && status != "cancelled") {
+        console.debug("we remove this event ID:", id)
+        events.removeEvent(id)
+        removed = removed + 1
+      }
+      else if (targetEvents[id]) {
+        let summary = targetEvents[id]["summary"]
+        console.debug("we should update this event ID:", id)
+        events.updateEvent(eventObject, summary)
+        updated = updated + 1
+      }
     }
-    let resp= await methods.AuthFetch(url, options);
-    let data = await resp.json()
-    added[dict[index]["id"]]=dict[index]
-    console.log(resp,data,"addevents")
-    
-  }
-  return added
-}
-
-//Sync Changes
-async function checkEvents(added,start,end){
-
-  let calendarid = await methods.readLocalStorage("calendarid")
-  start=new Date(`${start} 00:00`).toISOString() 
-  end=new Date(`${end} 24:00`).toISOString() 
-  let token = await methods.readLocalStorage("token")
-  let url = `https://www.googleapis.com/calendar/v3/calendars/${calendarid}/events?timeMax=${end}&timeMin=${start}&showDeleted=true`
-  const options = {
-    method: 'GET',
-    headers:new Headers({ 'authorization': `Bearer ${token}` })
-  }
-  let resp= await methods.AuthFetch(url, options)
-  let data = await resp.json()
-  console.log(resp,data,"Sync Changes Between Calendars")
-  for(let index in data["items"]){
-    let item=data["items"][index]
-    if(!added[item["id"]]){
-      removeEvent(item["id"])
+    for (let index in Object.keys(targetEvents)) {
+      let id = Object.keys(targetEvents)[index]
+      if (!calKeys.includes(id)) {
+        console.debug("we should add this event ID:", id)
+        added = added + 1
+        events.addEvents(targetEvents[id])
+      }
     }
-    if(item["status"]=="cancelled"){
-      let summary=added[item["id"]]["summary"]
-      updateEvent(item,summary)
-    }
-     
-
-   
   }
+  let id = await methods.getCalID()
+  let message= `Updated:${updated} Events\nAdded:${added} Events\nRemoved:${removed} Events\nTarget Calendar ID:${id}`
+
+  methods.printNotif(message,"Target Calendar Updated")
+
  
 
-}
-
-async function removeEvent(id){
-  let calendarid = await methods.readLocalStorage("calendarid")
-  let token = await methods.readLocalStorage("token")
-  let url = `https://www.googleapis.com/calendar/v3/calendars/${calendarid}/events/${id}`
- const options = {
-   method: 'DELETE',
-   headers:new Headers({ 'authorization': `Bearer ${token}` }),
- }
- let resp=await methods.AuthFetch(url,options)
- console.log(resp,"Remove Event")
-
-}
-
-
-async function updateEvent(event,summary){
   
-  let calendarid = await methods.readLocalStorage("calendarid")
-  let token = await methods.readLocalStorage("token")
-  let url = `https://www.googleapis.com/calendar/v3/calendars/${calendarid}/events/import`
-  const options = {
-    method: 'POST',
-    headers:new Headers({ 'authorization': `Bearer ${token}` }),
-    body: JSON.stringify({
-      start:event.start,
-      end:event.end,
-      id:event.id,
-      iCalUID:event.iCalUID,
-      summary:summary,
-      status:"confirmed"
-    })
-  }
-  let resp = await methods.AuthFetch(url, options)
-  let data= await resp.json()
-  console.log(resp,data,event,summary,"Restored Canceled")
 }
-
-
-// Calendar Check
-
-async function checkCal(){
-  let calendarid = await methods.readLocalStorage("calendarid")
+/*
+Validates Previously Set Calendar
+Creates New Calender if Needed
+np*/
+async function checkCal() {
+  let account = await methods.getAccountID(0)
   let token = await methods.readLocalStorage("token")
-  let url=`https://www.googleapis.com/calendar/v3/users/me/calendarList/${calendarid}`
+  let calendarid = await methods.getCalID()
+
+  if (token != null && calendarid != null) {
+    let check = await ValidateCurrentCal(token, calendarid)
+    if (check == false) {
+      await createCal(account)
+    }
+
+  }
+
+  else if (token != null) {
+    await createCal(account)
+    // await setTargetCal()
+
+  }
+}
+/*
+Check Status of Calendar
+*/
+async function ValidateCurrentCal(token, calendarid) {
+  let url = `https://www.googleapis.com/calendar/v3/calendars/${calendarid}`
   const options = {
     method: 'GET',
-    headers:new Headers({ 'authorization': `Bearer ${token}` }),
+    headers: new Headers({ 'authorization': `Bearer ${token}` }),
   }
-  let resp = await methods.AuthFetch(url, options)
-  if(resp.status==404){
-    await createCal()
+  let resp = await methods.AuthFetch(url, options, 0)
+  if (!resp&&resp!==null) {
+    return false
   }
-  let data= await resp.json()
-  if (data["deleted"]==true){
-    await createCal()
+  else if (resp.status == 404 || resp.status == 401) {
+    return false
   }
-
-  
+  else if (resp.status > 399) {
+    return "Error"
+  }
+  let data = await resp.json()
+  console.debug("Status of Calendar", data, resp)
+  if (data["deleted"] == true) {
+    return false
+  }
+  return true
 }
+/*
+Check for Existing Target Calendar(s)
+*/
+async function findTargetCal(token) {
+  console.debug("Looking for Calendar Named:Target")
+  let url = `https://www.googleapis.com/calendar/v3/users/me/calendarList/`
+  const options = {
+    method: 'GET',
+    headers: new Headers({ 'authorization': `Bearer ${token}` }),
+  }
+  let resp = await methods.AuthFetch(url, options, 0)
+  if (resp.status == 404) {
+    return false
+  }
 
-
-async function createCal(){
-    let url = `https://www.googleapis.com/calendar/v3/calendars`
-    let token = await methods.readLocalStorage("token")
-    const options = {
-      method: 'POST',
-      headers:new Headers({ 'authorization': `Bearer ${token}` }),
-      body: JSON.stringify({"summary":"target"})
+  let list = []
+  let data = await resp.json()
+  for (let index in data["items"]) {
+    let name = data["items"][index]["summary"]
+    let id = data["items"][index]["id"]
+    if (name == "target") {
+      list.push(id)
     }
-    let resp = await methods.AuthFetch(url, options)
-    let data = await resp.json()
-    console.log(resp,data,"createCal")
-
-    let key=Math.random().toString(20).substr(2, 8)
-    key = getUuid(key).replace(/-/g, '')
-    await methods.setLocalStorage({"key":key})
-    await methods.setLocalStorage({ "calendarid": data["id"] })   
+  }
+  return list
 }
-
-
-
-
-
-//General
-async function checkToken() {
+/*
+Create New Target Calendar
+*/
+async function createCal(account) {
+  let url = `https://www.googleapis.com/calendar/v3/calendars`
   let token = await methods.readLocalStorage("token")
-  console.log("Initial Token",token)
-  if (token) {
-    chrome.runtime.sendMessage({ "auth": true });
+  let options = {
+    method: 'POST',
+    headers: new Headers({ 'authorization': `Bearer ${token}` }),
+    body: JSON.stringify({ "summary": "target" })
   }
-  else {
-    chrome.runtime.sendMessage({ "auth": false });
-  }
+  let resp = await methods.AuthFetch(url, options, 0)
+  let data = await resp.json()
+  console.debug("createCal", resp, data,)
+  let key=`calid${account}`
+  await methods.setLocalStorage({ [key]: data["id"]})
 }
 
-async function upDate(datalist){
-  await checkCal()
-  for(let i=0;i<3;i++){
-    let data=datalist[i]
-    data = JSON.parse(data)
-    let added=await createDict(data)
-    checkEvents(added,data["start_date"],data["end_date"])
-}
+/*
+Set The Target Calendar for User if Valid is Found
+Create a new Target Calendar if Not
+*/
 
-}
-
-
-chrome.runtime.onMessage.addListener(function (message) {
-  if (message == "auth") {
-    auth()
+async function setTargetCal() {
+  //Need Additional Scopes Add later
+  let token = await methods.readLocalStorage("token")
+  let calendarlist = await findTargetCal(token)
+  let account = methods.getAccountID(0)
+  console.debug("List of IDs for Calendars with Named 'Target'", calendarlist)
+  if (calendarlist.length == 0) {
+    await createCal(account)
   }
-  if (message == "check_auth") {
-    checkToken()
-  };
-
-  if (message.sync) {
-    
-   upDate(message.sync)
-
+  for (let index in calendarlist) {
+    calendarid = calendarlist[index]
+    let check = await ValidateCurrentCal(token, calendarid)
+    if (check == false && index == calendarlist.length - 1) {
+      await createCal(account)
 
     }
+    else if (check == true) {
+      break
+    }
+  }
+}
 
-    
 
-  });
+
+/*
+Message Listeners
+*/
+chrome.runtime.onMessage.addListener(function (message) {
+  console.debug("Background Message:", message)
+  if (message == "auth") {
+    (async () => {
+      const auth = await methods.auth()
+      if (auth) {
+        chrome.runtime.sendMessage({ "auth": true });
+      }
+
+    })()
+
+  }
+  else if (message == "check_auth") {
+    methods.checkToken()
+  }
+  else if (message["sync"]) {
+    upDateCal(message["sync"])
+  }
+  else if (message == "logout") {
+    methods.logout()
+
+  }
+
+  else if (message == "cal_notif") {
+    methods.logout()
+
+  }
+
+})
+
+
+
 

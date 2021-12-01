@@ -14,10 +14,10 @@ const data = useContext(dataContext);
 let auth=data.auth
 
 useEffect(() => {
-    buttonref.current.addEventListener("click",handleClick)
+    buttonref.current.addEventListener("click",handleAuth)
 
   }, []);
-function handleClick(event){
+function handleAuth(event){
     event.preventDefault()
     chrome.runtime.sendMessage("auth");
 }
