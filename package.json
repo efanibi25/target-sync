@@ -1,6 +1,6 @@
 {
   "name": "Target Calendar Sync",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Sync Target Work Schedule to Google Calendar",
   "scripts": {
     "build": "node utils/build.js",
