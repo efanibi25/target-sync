@@ -11,7 +11,7 @@ const ASSET_PATH = process.env.ASSET_PATH || '/';
 
 var alias = {
   'react-dom': '@hot-loader/react-dom',
-  'node_modules': path.join(__dirname, 'node_modules'),
+  node_modules: path.join(__dirname, 'node_modules'),
 };
 
 // load the secrets
@@ -64,7 +64,7 @@ var options = {
           },
           {
             loader: 'css-loader',
-          }
+          },
         ],
       },
       {
