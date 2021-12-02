@@ -51,8 +51,8 @@ const AuthFetch = async (url, options, count) => {
     return resp
   }
   else {
-    await auth()
-    let token = await readLocalStorage("token")
+    let token=await auth()
+    await setLocalStorage({"token":token})
     options["headers"] = new Headers({ 'authorization': `Bearer ${token}` }),
       AuthFetch(url, options, count + 1)
   }
@@ -76,8 +76,8 @@ function auth() {
       var path = new URL(token)
       let hash = path.hash
       hash = hash.split("&")[0].split("=")[1]
-      setLocalStorage({ "token": hash })
-      resolve(true)
+      console.debug("New Hash:",hash)
+      resolve(hash)
     })
   });
 };
@@ -105,7 +105,8 @@ async function getAccountID(count) {
     return data["id"]
   }
   else {
-    await auth()
+    let token=await auth()
+    await setLocalStorage({"token":token})
     getAccountID(count + 1)
   }
 
@@ -114,6 +115,7 @@ async function getAccountID(count) {
 
 
 async function getAccountEmail(count) {
+  console.log("we need this")
   if (count == 4) {
     return
   }
@@ -134,7 +136,8 @@ async function getAccountEmail(count) {
     return data["email"]
   }
   else {
-    await auth()
+    let token=await auth()
+    setLocalStorage({"token":token})
     getAccountEmail(count + 1)
   }
 

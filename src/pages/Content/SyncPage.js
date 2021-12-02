@@ -21,21 +21,21 @@ const SyncPage = () => {
     const buttonref3 = useRef(null);
     const target_token = data.target_token
     const auth = data.auth
-    const [account, setAccount] = useState("");
+    const [email, setEmail] = useState("");
 
     const [calID, setCalID] = useState("");
+    const count=useRef(0)
 
 
     useEffect(() => {
 
-        // (async ()=>{
-        //     const account=await getAccountEmail(0)
-        //     if (account!==null){
-        //         setAccount(account)
-        //     }
-
-
-        // })()
+        chrome.runtime.onMessage.addListener(function (message) {
+            console.debug("Popup Message:", message)
+            if (message["data"]) {
+              setEmail(message["data"]["email"])
+              setCalID(message["data"]["calID"])
+            }
+          });
 
         buttonref2.current.addEventListener("click", handleLogout)
         buttonref3.current.addEventListener("click", handleUnset)
@@ -58,20 +58,11 @@ const SyncPage = () => {
 
 
     useEffect(() => {
-        (async () => {
-            const account = await getAccountEmail(0)
-            const id = await getCalID()
-            if (account !== null) {
-                setAccount(account)
-                setCalID(id)
+        chrome.runtime.sendMessage("getData")
 
-            }
-
-
-
-        })()
 
     }, [auth]);
+
     //beginning of weeks
     function getSundays() {
         let sundays = []
@@ -106,7 +97,10 @@ const SyncPage = () => {
     async function weeks() {
         let sundays = getSundays()
         let saturdays = getSatdays()
-        let temp = await calandarsync()
+        console.log("This is saturday",saturdays)
+        console.log("This is sunday",sundays)
+
+        let temp = await calandarSync()
         let memberdata = []
 
 
@@ -114,8 +108,9 @@ const SyncPage = () => {
             let sunday = sundays[i]
             let saturday = saturdays[i]
             let result = await temp(sunday, saturday)
+            console.log("this is stemp",i,result)
             if (result == false) {
-                break
+                continue
             }
             memberdata.push(result)
         }
@@ -126,18 +121,23 @@ const SyncPage = () => {
 
     }
 
-    function calandarsync() {
+    function calandarSync() {
         return async function workhours(sunday, saturday) {
+            if(count.current>0){
+                return
+            }
             let team_member_number = await readLocalStorage("team") || ""
             let location_id = await readLocalStorage("store") || ""
             let api = apikey["key"]
             if (team_member_number.lenth == 0 || location_id.length == 0) {
+                count.current=count.current+1
                 alert("You must Enter your Team Member Number and Location ID into Options")
+                return
             }
 
 
             let url = `https://api.target.com/wfm_schedules/v1/weekly_schedules?team_member_number=00${team_member_number}&start_date=${sunday}&end_date=${saturday}&location_id=${location_id}&key=${api}`
-
+            console.debug("Target API URL:",url)
             const options = {
                 method: 'GET',
                 headers: new Headers({ 'authorization': `${target_token}` }),
@@ -145,6 +145,7 @@ const SyncPage = () => {
             let wkdata = await fetch(url, options)
             wkdata = await wkdata.json()
             if (!wkdata["team_member_number"]) {
+                count.current=count.current+1
                 alert(" There was an error during Sync\n ErrorText:" + wkdata["message"])
                 return false
             }
@@ -161,13 +162,16 @@ const SyncPage = () => {
 
 
     function handleSync(event) {
+        count.current=0
         event.preventDefault()
-        weeks()
+        // weeks()
+        chrome.runtime.sendMessage({"startSync":target_token});
+
     }
 
     function handleLogout(event) {
         chrome.runtime.sendMessage("logout");
-        setAccount("")
+        setEmail("")
     }
 
 
@@ -198,7 +202,7 @@ const SyncPage = () => {
                 </Grid>
                 <Grid item style={{ "width": "95%" }}>
                     <Typography align="left" style={{ "color": "white", "fontSize": "15px","width":"100%","wordWrap": "break-word","marginBottom":"3.5%"  }}>
-                        G-Account:{account}
+                        G-Account:{email}
                     </Typography>
                     <Typography  align="left" style={{ "color": "white", "fontSize": "14px","width":"100%","wordWrap": "break-word" }} paragraph={true}>
                         Cal-ID:{calID}
