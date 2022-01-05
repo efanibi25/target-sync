@@ -9,6 +9,7 @@ const Popup = () => {
   const [tab, setTab] = useState(null);
   const [target_token, setTargetToken] = useState(null);
   let shared = { auth, setAuth, target_token };
+ 
 
   function setTarget() {
     return localStorage['access_token'];
@@ -26,6 +27,10 @@ const Popup = () => {
       } else if (message['auth'] == false) {
         setAuth(false);
       }
+
+
+
+      
     });
 
     chrome.runtime.sendMessage('check_auth');

@@ -2,11 +2,11 @@ import secrets from 'secrets';
 import icon from '../src/assets/img/icon128.png';
 
 /*
-Chrome local storage command, but with promises
+Chrome sync storage command, but with promises
 */
 const readLocalStorage = async (key) => {
   return new Promise((resolve, reject) => {
-    chrome.storage.local.get([key], function (result) {
+    chrome.storage.sync.get([key], function (result) {
       console.debug('Reading from storage', result);
       if (Object.keys(result).length === 0) {
         resolve(null);
@@ -23,12 +23,12 @@ const readLocalStorage = async (key) => {
 };
 
 /*
-Chrome local storage command, but with promises
+Chrome local sync command, but with promises
 */
 
 const setLocalStorage = async (obj) => {
   return new Promise((resolve, reject) => {
-    chrome.storage.local.set(obj, function (result) {
+    chrome.storage.sync.set(obj, function (result) {
       console.debug('Setting Storage', obj);
       resolve(obj);
     });
@@ -40,18 +40,20 @@ Fetch URL
 Checks if authenticated if not, allows user to login.
 */
 const AuthFetch = async (url, options, count) => {
-  if (count == 2) {
-    return;
-  }
+
   let resp = await fetch(url, options);
   console.debug('Validating Token:', resp, count);
   if (resp.status != 401 && resp.status != 404) {
     return resp;
-  } else {
+  }
+  if (count >= 2) {
+    return;
+  }
+  else {
     let token = await auth();
-    await setLocalStorage({ token: token });
-    (options['headers'] = new Headers({ authorization: `Bearer ${token}` })),
-      AuthFetch(url, options, count + 1);
+    await setLocalStorage({ "token": token });
+    options['headers'] = new Headers({ authorization: `Bearer ${token}` })
+    AuthFetch(url, options, count + 1);
   }
 };
 
@@ -82,9 +84,6 @@ function auth() {
 }
 
 async function getAccountID(count) {
-  if (count == 4) {
-    return;
-  }
   let token = await readLocalStorage('token');
   const options = {
     method: 'GET',
@@ -99,7 +98,12 @@ async function getAccountID(count) {
     let data = await resp.json();
     console.debug(data);
     return data['id'];
-  } else {
+  }
+  if (count >= 4) {
+    return;
+  }
+
+  else {
     let token = await auth();
     await setLocalStorage({ token: token });
     getAccountID(count + 1);
@@ -107,10 +111,6 @@ async function getAccountID(count) {
 }
 
 async function getAccountEmail(count) {
-  console.log('we need this');
-  if (count == 4) {
-    return;
-  }
   let token = await readLocalStorage('token');
   const options = {
     method: 'GET',
@@ -125,7 +125,12 @@ async function getAccountEmail(count) {
     let data = await resp.json();
     console.debug(data);
     return data['email'];
-  } else {
+  }
+  if (count >= 4) {
+    return;
+  }
+
+  else {
     let token = await auth();
     setLocalStorage({ token: token });
     getAccountEmail(count + 1);
@@ -136,6 +141,7 @@ async function getCalID() {
   let account = await getAccountID();
   if (account !== null) {
     let key = `calid${account}`;
+    console.debug('Calendar ID', key);
     return await readLocalStorage(key);
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "Target Calendar Sync",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Sync Target Work Schedule to Google Calendar",
   "scripts": {
     "build": "node utils/build.js",
@@ -11,6 +11,7 @@
     "@fontsource/roboto": "^4.5.1",
     "@hot-loader/react-dom": "^17.0.1",
     "@material-ui/core": "^4.12.3",
+    "@material-ui/icons": "^4.11.2",
     "@types/chrome": "0.0.132",
     "@types/react": "^17.0.2",
     "@types/react-dom": "^17.0.1",

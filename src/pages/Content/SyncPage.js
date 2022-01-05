@@ -8,11 +8,9 @@ import React, {
 import './content.css';
 import {
   readLocalStorage,
-  getAccountEmail,
   setLocalStorage,
   getAccountID,
   printNotif,
-  getCalID,
 } from '../../../methods/general';
 
 import { Button } from '@material-ui/core';
@@ -22,19 +20,19 @@ import Typography from '@material-ui/core/Typography';
 
 import CardContent from '@material-ui/core/CardContent';
 import { dataContext } from '../Popup/Popup';
-import { apikey } from './apikey';
+
+
 
 const SyncPage = () => {
   const data = useContext(dataContext);
   const buttonref = useRef(null);
   const buttonref2 = useRef(null);
-  const buttonref3 = useRef(null);
   const target_token = data.target_token;
   const auth = data.auth;
   const [email, setEmail] = useState('');
 
   const [calID, setCalID] = useState('');
-  const count = useRef(0);
+  const countRef = useRef(0);
 
   useEffect(() => {
     chrome.runtime.onMessage.addListener(function (message) {
@@ -46,7 +44,27 @@ const SyncPage = () => {
     });
 
     buttonref2.current.addEventListener('click', handleLogout);
-    buttonref3.current.addEventListener('click', handleUnset);
+
+
+
+
+    chrome.runtime.onMessage.addListener(function (message) {
+      console.debug('Sync Message:', message);
+
+    
+
+      if (message["alert"]&& countRef.current===0) {
+        countRef.current=countRef.current+1
+        alert(message["alert"]);
+
+      }
+
+      else if (message["calNameUpdated"]) {
+        setCalID(message["calNameUpdated"])
+      }
+
+      
+    });
   }, []);
 
   useEffect(() => {
@@ -60,7 +78,7 @@ const SyncPage = () => {
   }, [auth]);
 
   function handleSync(event) {
-    count.current = 0;
+    countRef.current = 0;
     event.preventDefault();
     // weeks()
     chrome.runtime.sendMessage({ startSync: target_token });
@@ -71,17 +89,7 @@ const SyncPage = () => {
     setEmail('');
   }
 
-  async function handleUnset(event) {
-    let account = await getAccountID(0);
-    let key = `calid${account}`;
-    console.debug(key);
-    await setLocalStorage({ [key]: null });
-    await readLocalStorage(key);
-    printNotif(
-      'Target Calendar Unset\n Delete Old Target Calendar if Not Done Previously',
-      'Target Calendar Deleted'
-    );
-  }
+
 
   return (
     <Fragment>
@@ -133,9 +141,6 @@ const SyncPage = () => {
               Sync
             </Button>
           )}
-          <Button variant="contained" color="primary" ref={buttonref3}>
-            Unset T-Cal
-          </Button>
           <Button variant="contained" color="primary" ref={buttonref2}>
             Logout
           </Button>

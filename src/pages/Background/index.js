@@ -9,8 +9,9 @@ chrome.runtime.onMessage.addListener(function (message) {
   console.debug('Background Message:', message);
   if (message == 'auth') {
     (async () => {
-      const auth = await methods.auth();
-      if (auth) {
+      const token = await methods.auth();
+      if (token) {
+        await methods.setLocalStorage({ "token": token })
         chrome.runtime.sendMessage({ auth: true });
       }
     })();
@@ -22,16 +23,14 @@ chrome.runtime.onMessage.addListener(function (message) {
     (async () => {
       const calID = await methods.getCalID(0);
       const email = await methods.getAccountEmail(0);
-      console.log('this works');
       chrome.runtime.sendMessage({ data: { email: email, calID: calID } });
     })();
   } else if (message['startSync']) {
     (async () => {
       const target_token = message['startSync'];
       let memberdata = await weeks(target_token);
-      if (memberdata) {
         upDateCal(memberdata);
-      }
+      
     })();
   }
 });

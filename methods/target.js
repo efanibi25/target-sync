@@ -4,8 +4,8 @@ import { readLocalStorage, setLocalStorage } from './general';
 async function weeks(target_token) {
   let sundays = getSundays();
   let saturdays = getSatdays();
-  console.log('This is saturday', saturdays);
-  console.log('This is sunday', sundays);
+  console.debug('This is saturday', saturdays);
+  console.debug('This is sunday', sundays);
 
   let temp = await calandarSync(target_token);
   let memberdata = [];
@@ -14,15 +14,12 @@ async function weeks(target_token) {
     let sunday = sundays[i];
     let saturday = saturdays[i];
     let result = await temp(sunday, saturday);
-    console.log('this is stemp', i, result);
-    if (result == false) {
+    if (result === false) {
       continue;
     }
     memberdata.push(result);
   }
-  if (memberdata.length > 0) {
-    return memberdata;
-  }
+  return memberdata;
 }
 
 function calandarSync(target_token) {
@@ -30,12 +27,11 @@ function calandarSync(target_token) {
     let team_member_number = (await readLocalStorage('team')) || '';
     let location_id = (await readLocalStorage('store')) || '';
     let api = apikey['key'];
-    if (team_member_number.lenth == 0 || location_id.length == 0) {
-      alert(
-        'You must Enter your Team Member Number and Location ID into Options'
-      );
-      return;
-    }
+    if (team_member_number.lenth == 0 || location_id.length == 0) { 
+      chrome.runtime.sendMessage({"alert":"You must Enter your Team Member Number and Location ID into Options"});   
+      return false
+    }      
+
 
     let url = `https://api.target.com/wfm_schedules/v1/weekly_schedules?team_member_number=00${team_member_number}&start_date=${sunday}&end_date=${saturday}&location_id=${location_id}&key=${api}`;
     console.debug('Target API URL:', url);
@@ -45,8 +41,10 @@ function calandarSync(target_token) {
     };
     let wkdata = await fetch(url, options);
     wkdata = await wkdata.json();
+    
     if (!wkdata['team_member_number']) {
-      alert(' There was an error during Sync\n ErrorText:' + wkdata['message']);
+      chrome.runtime.sendMessage({"alert":wkdata['message']});
+
       return false;
     }
     wkdata = JSON.stringify(wkdata);

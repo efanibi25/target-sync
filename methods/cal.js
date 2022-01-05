@@ -3,18 +3,27 @@ import * as events from '../methods/events.js';
 import { key } from '../secrets.js';
 const getUuid = require('uuid-by-string');
 
+
 /*
 Sync 'Target' Calendar Events With Work Schedule
-i>3 Because only up to 3 weeks max for Target Schedules
 */
 async function upDateCal(datalist) {
+  let token = await methods.readLocalStorage("token")
+
+
+  if (datalist.length === 0) {
+    return
+  }
   await checkCal();
   let added = 0;
   let updated = 0;
   let removed = 0;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < datalist.length; i++) {
     let data = datalist[i];
     console.debug('Work Hours Array:', datalist, 'index:', i);
+    if (data === null || data === undefined) {
+      continue
+    }
     data = JSON.parse(data);
     if (data == null) {
       continue;
@@ -24,7 +33,7 @@ async function upDateCal(datalist) {
     let targetStart = data['start_date'];
     let targetEnd = data['end_date'];
     let eventList = await events.getEvents(targetStart, targetEnd);
-    let calKeys = eventList.reduce((prev, curr) => {
+    let calIDs = eventList.reduce((prev, curr) => {
       prev.push(curr['id']);
       return prev;
     }, []);
@@ -46,7 +55,7 @@ async function upDateCal(datalist) {
     }
     for (let index in Object.keys(targetEvents)) {
       let id = Object.keys(targetEvents)[index];
-      if (!calKeys.includes(id)) {
+      if (!calIDs.includes(id)) {
         console.debug('we should add this event ID:', id);
         added = added + 1;
         events.addEvents(targetEvents[id]);
@@ -101,13 +110,15 @@ async function createCal(account) {
   let options = {
     method: 'POST',
     headers: new Headers({ authorization: `Bearer ${token}` }),
-    body: JSON.stringify({ summary: 'target' }),
+    body: JSON.stringify({ summary: 'Target' }),
   };
   let resp = await methods.AuthFetch(url, options, 0);
   let data = await resp.json();
   console.debug('createCal', resp, data);
   let key = `calid${account}`;
   await methods.setLocalStorage({ [key]: data['id'] });
+  chrome.runtime.sendMessage({ "calNameUpdated": data['id'] });
+  return data['id']
 }
 
 /*
@@ -137,7 +148,7 @@ async function ValidateCurrentCal(token, calendarid) {
 
 /*
 Validates Previously Set Calendar
-Creates New Calender if Needed
+Creates New Calendar if Needed
 np*/
 async function checkCal() {
   let account = await methods.getAccountID(0);
@@ -147,10 +158,14 @@ async function checkCal() {
   if (token != null && calendarid != null) {
     let check = await ValidateCurrentCal(token, calendarid);
     if (check == false) {
-      await createCal(account);
+      let id = await createCal(account);
+      chrome.runtime.sendMessage({ "alert": `Issue with ID:${calendarid} \nA New Calendar was made \nID:${id}` });
+
+
     }
   } else if (token != null) {
-    await createCal(account);
+    let id = await createCal(account);
+    chrome.runtime.sendMessage({ "alert": `A New Calendar was Made with the ID:${id}` });
     // await setTargetCal()
   }
 }
